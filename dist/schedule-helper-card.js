@@ -12,7 +12,7 @@
  * Custom elements are registered only where `customElements` exists.
  */
 
-export const VERSION = '2.0.2-lite';
+export const VERSION = '2.0.3-lite';
 
 // ---------------------------------------------------------------------------- week model
 
@@ -596,6 +596,8 @@ export const STRINGS = {
     drivesNothing: 'אף אוטומציה לא משתמשת בתזמון הזה — הוא לא מפעיל כלום.',
     hours: 'שעות פעילות',
     addRange: 'טווח',
+    rangeDays: 'ימים לטווח הזה',
+    everyDay: 'כל יום',
     from: 'מ־',
     to: 'עד',
     midnightHint: 'שעון 24 שעות; סיום 00:00 או 24:00 = עד חצות',
@@ -688,6 +690,8 @@ export const STRINGS = {
     drivesNothing: 'No automation uses this schedule, so it drives nothing.',
     hours: 'Active hours',
     addRange: 'Range',
+    rangeDays: 'Days for this range',
+    everyDay: 'Every day',
     from: 'From',
     to: 'To',
     midnightHint: '24-hour clock; an end of 00:00 or 24:00 means until midnight',
@@ -1145,7 +1149,7 @@ class ScheduleEditor {
     this.automations = null; // existing schedule: the automations it drives
     this.driven = null; // existing schedule: {automation, config, parsed} for the one automation the card can rewrite
     this.handEdited = false;
-    this.rangeEdit = null; // {day, index}
+    this.rangeEdit = null; // {day, index, chosen: Set} — chosen is used when adding a range
     this.copyFrom = null; // {day, chosen: Set}
     this.query = '';
     this.picker = null;
@@ -1405,6 +1409,11 @@ class ScheduleEditor {
           <label><span>${esc(t.to)}</span><input type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="HH:MM" id="to" data-focus="to"
             value="${esc(this.rangeEdit.to ?? hm(b.end))}"></label>
         </div>
+        ${this.rangeEdit.index == null ? `<div class="label">${esc(t.rangeDays)}</div>
+          <div class="chips"><button class="choice" data-act="rangePreset" data-v="weekdays" aria-pressed="${[1, 2, 3, 4, 5].every((k) => this.rangeEdit.chosen.has(k)) && this.rangeEdit.chosen.size === 5}">${esc(t.weekdays)}</button>
+            <button class="choice" data-act="rangePreset" data-v="week" aria-pressed="${this.rangeEdit.chosen.size === 7}">${esc(t.everyDay)}</button></div>
+          <div class="copy-days">${DAYS.map((_, k) => `<label class="check"><input type="checkbox" data-field="rangeDay" data-v="${k}" ${this.rangeEdit.chosen.has(k) ? 'checked' : ''}>
+            <span>${esc(DAY_NAMES[this.lang][k])}</span></label>`).join('')}</div>` : ''}
         ${this.rangeEdit.error ? `<div class="error small" role="alert">${esc(this.rangeEdit.error)}</div>` : ''}
         <div class="actions"><button class="btn" data-act="rangeCancel">${esc(t.cancel)}</button><button class="btn primary" data-act="rangeOk">${esc(t.ok)}</button></div>
       </div>`;
@@ -1509,10 +1518,14 @@ class ScheduleEditor {
         break;
       }
       case 'clear': for (const d of DAYS) w.days[d] = []; this.rangeEdit = this.copyFrom = null; break;
-      case 'add': this.rangeEdit = { day, index: null }; this.copyFrom = null; this.focusPanel = true; break;
+      case 'add': this.rangeEdit = { day, index: null, chosen: new Set([day]) }; this.copyFrom = null; this.focusPanel = true; break;
       case 'edit': this.rangeEdit = { day, index }; this.copyFrom = null; this.focusPanel = true; break;
       case 'remove': w.days[DAYS[day]] = w.days[DAYS[day]].filter((_, k) => k !== index); this.rangeEdit = null; break;
       case 'rangeCancel': this.rangeEdit = null; break;
+      case 'rangePreset': {
+        this.rangeEdit.chosen = new Set(el.dataset.v === 'weekdays' ? [1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6]);
+        break;
+      }
       case 'rangeOk': {
         const from = this.dlg.querySelector('#from').value;
         const to = this.dlg.querySelector('#to').value;
@@ -1530,16 +1543,28 @@ class ScheduleEditor {
           this.focusPanel = true;
           break;
         }
-        const d = DAYS[this.rangeEdit.day];
-        const old = this.rangeEdit.index != null ? w.days[d][this.rangeEdit.index] : null;
-        const next = w.days[d].filter((_, k) => k !== this.rangeEdit.index);
-        next.push({ ...(old?.data ? { data: old.data } : {}), start, end });
-        w.days[d] = next.sort(byStart);
+        const chosen = this.rangeEdit.index == null ? [...this.rangeEdit.chosen] : [this.rangeEdit.day];
+        if (!chosen.length) {
+          this.rangeEdit.error = this.t.rangeDays;
+          break;
+        }
+        const conflict = chosen.find((k) => w.days[DAYS[k]].some((b, i) => i !== (k === this.rangeEdit.day ? this.rangeEdit.index : null) && start < b.end && end > b.start));
+        if (conflict !== undefined) {
+          this.rangeEdit.error = this.t.errOverlap(DAY_NAMES[this.lang][conflict]);
+          break;
+        }
+        for (const k of chosen) {
+          const d = DAYS[k];
+          const old = this.rangeEdit.index != null ? w.days[d][this.rangeEdit.index] : null;
+          const next = w.days[d].filter((_, i) => i !== (k === this.rangeEdit.day ? this.rangeEdit.index : null));
+          next.push({ ...(old?.data ? { data: old.data } : {}), start, end });
+          w.days[d] = next.sort(byStart);
+        }
         this.rangeEdit = null;
         break;
       }
       case 'copyOpen': this.copyFrom = { day, chosen: new Set() }; this.rangeEdit = null; this.focusPanel = true; break;
-      case 'copyPreset': for (const k of el.dataset.v === 'weekdays' ? [0, 1, 2, 3, 4] : [0, 1, 2, 3, 4, 5, 6]) this.copyFrom.chosen.add(k); break;
+      case 'copyPreset': this.copyFrom.chosen = new Set(el.dataset.v === 'weekdays' ? [1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6]); break;
       case 'copyCancel': this.copyFrom = null; break;
       case 'copyOk': {
         const from = w.days[DAYS[this.copyFrom.day]];
@@ -1568,6 +1593,11 @@ class ScheduleEditor {
     if (f === 'copyDay') {
       const k = Number(e.target.dataset.v);
       e.target.checked ? this.copyFrom.chosen.add(k) : this.copyFrom.chosen.delete(k);
+      return;
+    }
+    if (f === 'rangeDay') {
+      const k = Number(e.target.dataset.v);
+      e.target.checked ? this.rangeEdit.chosen.add(k) : this.rangeEdit.chosen.delete(k);
       return;
     }
     if (f === 'useTemp') this.temperature = e.target.checked ? actionOptions(this.device).temp.initial : null;

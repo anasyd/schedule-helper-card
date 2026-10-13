@@ -8,6 +8,8 @@ The card uses Home Assistant's native `schedule` helper and a normal automation 
 
 A schedule has one or more daily time ranges. At the start of a range, the automation runs the selected on action. At the end, it runs the off action if that option is enabled. For climate entities, the card can set an HVAC mode and target temperature. For lights, it can set brightness.
 
+To use one time range on several days, press **+ Range** on any day, enter the time, then select **Weekdays** (Monday–Friday), **Every day**, or individual days before pressing **OK**. Add separate ranges for Saturday and Sunday. The new range is added to each selected day; existing ranges remain in place. If it overlaps an existing range on any selected day, the editor shows that day and changes none of them.
+
 The generated automation responds to schedule state transitions. It does not currently reapply a device state after Home Assistant restarts during an active range. Test that behavior before relying on it for heating or other important equipment.
 
 ## Install from this fork

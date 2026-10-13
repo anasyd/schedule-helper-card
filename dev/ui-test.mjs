@@ -82,6 +82,41 @@ const CHECKS = [
     must(on.action === 'climate.set_temperature' && on.data.hvac_mode === 'heat' && on.data.temperature === 25, JSON.stringify(on));
     must(S().querySelector('.row[data-id="schedule.mzgn_yldym"]'), 'row appears');
   `],
+  ['one range can cover Monday to Friday while weekends differ', 'lang=en', `
+    click(S().querySelector('[data-act=new]'), 'new');
+    await sleep(200);
+    click(D().querySelector('[data-act=add][data-day="1"]'), 'Monday range');
+    click(D().querySelector('[data-act=rangePreset][data-v=weekdays]'), 'Monday to Friday');
+    must([...D().querySelectorAll('[data-field=rangeDay]')].filter((c) => c.checked).map((c) => Number(c.dataset.v)).join(',') === '1,2,3,4,5', 'weekday selection');
+    D().querySelector('#from').value = '07:00';
+    D().querySelector('#to').value = '09:00';
+    click(D().querySelector('[data-act=rangeOk]'), 'weekday time');
+    await addRange(6, '10:00', '12:00');
+    await addRange(0, '11:00', '13:00');
+    const days = [...D().querySelectorAll('.day')];
+    must(days[0].querySelector('.range').textContent.trim() === '11:00–13:00', 'Sunday');
+    for (let k = 1; k <= 5; k++) must(days[k].querySelector('.range').textContent.trim() === '07:00–09:00', 'weekday ' + k);
+    must(days[6].querySelector('.range').textContent.trim() === '10:00–12:00', 'Saturday');
+
+    click(D().querySelector('[data-act=add][data-day="0"]'), 'new Sunday range');
+    toggle(D().querySelector('[data-field=rangeDay][data-v="1"]'), true, 'also Monday');
+    D().querySelector('#from').value = '08:00';
+    D().querySelector('#to').value = '10:00';
+    click(D().querySelector('[data-act=rangeOk]'), 'overlapping range');
+    must(D().querySelector('.panel .error').textContent.includes('Monday'), 'overlap identifies Monday');
+    must([...D().querySelectorAll('.day')].every((d) => d.querySelectorAll('.range').length === 1), 'no selected day changed on conflict');
+    click(D().querySelector('[data-act=rangeCancel]'), 'cancel overlap');
+    click(D().querySelector('[data-act=pick]'), 'pick device');
+    await sleep(500);
+    click(D().querySelector('[data-id="light.balcony"]'), 'balcony light');
+    click(D().querySelector('[data-act=save]'), 'save multi-day schedule');
+    await sleep(1500);
+    const create = fake.calls.find((c) => c.type === 'schedule/create');
+    must(create, 'schedule created');
+    must(create.sunday[0].from === '11:00:00' && create.saturday[0].from === '10:00:00', 'weekend saved separately');
+    for (const d of ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'])
+      must(create[d].length === 1 && create[d][0].from === '07:00:00' && create[d][0].to === '09:00:00', d + ' saved');
+  `],
   ['edit a schedule: rename and change what it does', '', `
     await openEditor('schedule.living_room_ac_shabbat');
     must(D().querySelector('.device'), 'What it does section');
