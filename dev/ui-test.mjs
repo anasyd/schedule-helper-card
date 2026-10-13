@@ -9,13 +9,12 @@ import { launchChrome, startServer } from './cdp.mjs';
 
 const PORT = Number(process.env.PORT || 8766);
 const BASE = `http://127.0.0.1:${PORT}/dev/card-preview.html?`;
-const READY = "!!window.fake && !!document.getElementById('schedules')?.shadowRoot?.querySelector('.bars') && !!document.getElementById('shabbat')?.shadowRoot?.querySelector('.mode')";
+const READY = "!!window.fake && !!document.getElementById('schedules')?.shadowRoot?.querySelector('.bars')";
 
 // Helpers available inside every check.
 const PRELUDE = `
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const S = () => document.getElementById('schedules').shadowRoot;
-  const B = () => document.getElementById('shabbat').shadowRoot;
   const D = () => S().querySelector('dialog');
   const must = (cond, msg) => { if (!cond) throw new Error(msg); };
   const click = (el, what) => { must(el, 'missing: ' + what); el.click(); };
@@ -41,36 +40,28 @@ const PRELUDE = `
 `;
 
 const CHECKS = [
-  ['both cards render the house', '', `
+  ['the schedule card renders the house', '', `
     must(S().querySelectorAll('.row').length === 7, 'rows: ' + S().querySelectorAll('.row').length);
     must(S().querySelectorAll('.row .bars').length === 7, 'every schedule has its week, YAML too');
     must(S().querySelectorAll('.row[data-id]').length === 6, 'the YAML schedule is not editable');
     must([...S().querySelectorAll('.row')].some((r) => !r.dataset.id && r.textContent.includes('YAML')), 'the YAML schedule says so');
-    must(!S().querySelector('.body .ic') && !B().querySelector('.body .ic'), 'no icons in the cards');
-    must(B().querySelectorAll('.mode').length === 2, 'two modes');
-    must(B().querySelectorAll('[data-automode]').length === 2, 'automatic Shabbat and chag');
-    must(B().querySelector('.cal-date').textContent.includes('טבת'), 'calendar');
+    must(!S().querySelector('.body .ic'), 'no icons in the cards');
   `],
-  ['the card types from before 2.0 still render', '', `
-    for (const tag of ['beit-schedule-card', 'beit-shabbat-card']) {
-      const el = document.createElement(tag);
-      el.setConfig({});
-      el.hass = fake.snapshot();
-      document.body.appendChild(el);
-      await sleep(300);
-      must(el.shadowRoot?.querySelector(tag === 'beit-schedule-card' ? '.row' : '.mode'), tag + ' renders');
-      el.remove();
-    }
-    must(!window.customCards.some((c) => c.type.startsWith('beit-')), 'old names are not offered in the picker');
+  ['the schedule card name from before 2.0 still renders', '', `
+    const el = document.createElement('beit-schedule-card');
+    el.setConfig({});
+    el.hass = fake.snapshot();
+    document.body.appendChild(el);
+    await sleep(300);
+    must(el.shadowRoot?.querySelector('.row'), 'legacy schedule card renders');
+    el.remove();
   `],
   ['a non-admin sees everything, edits nothing', 'admin=0', `
     must(!S().querySelector('[data-act=new]'), 'no New schedule');
     must(S().querySelectorAll('.row[data-id]').length === 0, 'no editable rows');
     must(S().querySelectorAll('.row .bars').length === 7, 'weeks via get_schedule');
-    must([...B().querySelectorAll('[data-automode]')].every((i) => i.disabled), 'automatic switches disabled');
-    must(!B().querySelector('[data-act=members]'), 'no Choose automations');
   `],
-  ['create a schedule: device, action, hours, mode', '', `
+  ['create a schedule: device, action, hours', '', `
     click(S().querySelector('[data-act=new]'), 'new');
     await sleep(200);
     click(D().querySelector('[data-act=pick]'), 'pick');
@@ -80,7 +71,6 @@ const CHECKS = [
     click(D().querySelector('[data-id="climate.kids_ac"]'), 'device');
     click(D().querySelector('[data-act=hvac][data-v=heat]'), 'heat');
     toggle(D().querySelector('[data-field=useTemp]'), true, 'temp');
-    click(D().querySelector('[data-act=mode][data-mode="חג"]'), 'chag');
     await addRange(4, '7', '0');
     must(D().querySelector('.range').textContent.trim() === '07:00–24:00', 'typed 7 and 0: ' + D().querySelector('.range')?.textContent);
     click(D().querySelector('[data-act=save]'), 'save');
@@ -90,7 +80,6 @@ const CHECKS = [
     must(create && create.thursday[0].to === '24:00:00', 'schedule/create');
     const on = posts()[0].body.actions[0].choose[0].sequence[0];
     must(on.action === 'climate.set_temperature' && on.data.hvac_mode === 'heat' && on.data.temperature === 25, JSON.stringify(on));
-    must(fake.entities['schedule.mzgn_yldym'].labels.includes('khg'), 'labelled chag');
     must(S().querySelector('.row[data-id="schedule.mzgn_yldym"]'), 'row appears');
   `],
   ['edit a schedule: rename and change what it does', '', `
@@ -170,52 +159,6 @@ const CHECKS = [
     await openEditor('schedule.bedroom_ac_shabbat');
     noOverlap();
   `],
-  ['the mode switch turns every member on', '', `
-    toggle(B().querySelector('[data-master="שבת"]'), true, 'master');
-    await sleep(300);
-    for (const id of ['automation.beit_bedroom_ac_shabbat', 'automation.beit_hot_plate_shabbat', 'automation.living_room_fan_shabbat']) {
-      must(fake.states[id].state === 'on', id);
-    }
-  `],
-  ['taking an automation out keeps a schedule another member follows', '', `
-    click(B().querySelector('[data-act=members][data-mode="שבת"]'), 'Choose automations');
-    await sleep(200);
-    const dlg = B().querySelector('dialog');
-    must(![...dlg.querySelectorAll('[data-id]')].some((b) => b.closest('label').textContent.includes('אוטומטי')), 'automatic ones are not offered');
-    toggle(dlg.querySelector('[data-id="automation.living_room_fan_shabbat"]'), false, 'fan');
-    await sleep(500);
-    must(!fake.entities['automation.living_room_fan_shabbat'].labels.includes('shbt'), 'fan out');
-    must(fake.entities['schedule.living_room_ac_shabbat'].labels.includes('shbt'), 'schedule still in the mode');
-  `],
-  ['automatic Shabbat: a start before candle lighting, off disables', '', `
-    click(B().querySelector('[data-act=startEdit][data-mode="שבת"]'), 'change start');
-    toggle(B().querySelector('[data-start-kind][value=hoursBefore]'), true, 'hours before');
-    type(B().getElementById('start-hb'), '3', 'hours');
-    click(B().querySelector('[data-act=startSave]'), 'save start');
-    await sleep(100);
-    toggle(B().querySelector('[data-automode="שבת"]'), true, 'switch on');
-    await sleep(1200);
-    const p = posts().find((c) => c.body.alias === 'Beit · מצב שבת אוטומטי');
-    must(p && p.body.triggers[0].at.offset === '-03:00:00', 'offset: ' + JSON.stringify(p?.body.triggers[0]));
-    toggle(B().querySelector('[data-automode="שבת"]'), false, 'switch off');
-    await sleep(600);
-    const id = Object.keys(fake.states).find((k) => fake.states[k].attributes.friendly_name === 'Beit · מצב שבת אוטומטי');
-    must(id && fake.states[id].state === 'off', 'disabled, still there');
-    must(!fake.calls.some((c) => c.method === 'DELETE'), 'never deleted');
-  `],
-  ['automatic chag is created with the Jewish Calendar', '', `
-    toggle(B().querySelector('[data-automode="חג"]'), true, 'chag on');
-    await sleep(1200);
-    const p = posts().find((c) => c.body.alias === 'Beit · מצב חג אוטומטי');
-    must(p, 'created');
-    must(p.body.triggers[1].entity_id[0].startsWith('binary_sensor.jewish_calendar_issur_melacha'), 'ends with issur melacha');
-    must(B().querySelector('[data-automode="חג"]').checked, 'shown on');
-  `],
-  ['show_modes: false hides Shabbat and chag', 'schedules=' + encodeURIComponent('{"show_modes":false}'), `
-    must(!S().querySelector('.list .chip'), 'no mode chips');
-    await openEditor('schedule.bedroom_ac_shabbat');
-    must(!D().querySelector('.seg'), 'no mode choice');
-  `],
   ['a fixed height scrolls inside the card', 'schedules=' + encodeURIComponent('{"height":"400px"}'), `
     const card = S().querySelector('ha-card');
     must(Math.round(card.getBoundingClientRect().height) === 400, 'height ' + card.getBoundingClientRect().height);
@@ -228,7 +171,7 @@ const CHECKS = [
     click(ed.querySelector('[data-act=makeDash]'), 'create button');
     await sleep(300);
     must(fake._dashboards.some((d) => d.url_path === 'schedule-helper'), 'dashboard created');
-    must(fake._lovelace['schedule-helper'].views[0].cards.length === 2, 'with both cards');
+    must(fake._lovelace['schedule-helper'].views[0].cards.length === 1, 'one card');
     must(ed.querySelector('[data-dash] a[href="/schedule-helper"]'), 'Open link');
     must(!ed.querySelector('[data-act=makeDash]'), 'no second button');
   `],

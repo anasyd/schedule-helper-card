@@ -1,4 +1,4 @@
-// Headless Chrome over the DevTools protocol, and the preview server, for dev/ui-test.mjs and dev/screenshots.mjs.
+// Headless Chrome over the DevTools protocol, and the preview server, for dev/ui-test.mjs.
 // No dependencies: node's own fetch, WebSocket and child_process.
 
 import { spawn } from 'node:child_process';

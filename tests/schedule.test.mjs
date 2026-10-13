@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   WeekSchedule, parseBlock, formatBlock, blockLabel, DAYS, BEIT_MARKER, buildScheduleAutomation, onActions, offActions,
-  isOurs, schedulesIn, modeState, findCalendar, autoShabbatEndTrigger, buildAutoShabbatAutomation, AUTO_SHABBAT_ALIAS,
+  isOurs,
 } from '../dist/schedule-helper-card.js';
 
 const fixture = (name) => JSON.parse(readFileSync(new URL(`fixtures/${name}.json`, import.meta.url)));
@@ -153,56 +153,4 @@ test('isOurs looks for the marker in the description', () => {
   assert.equal(isOurs({ description: `${BEIT_MARKER} — x` }), true);
   assert.equal(isOurs({ description: 'hand-written' }), false);
   assert.equal(isOurs(null), false);
-});
-
-test('schedulesIn collects the schedules an automation refers to', () => {
-  const cfg = fixture('automation_configs')['automation.living_room_fan_shabbat'];
-  assert.deepEqual(schedulesIn(cfg), ['schedule.living_room_ac_shabbat']);
-});
-
-test('modeState', () => {
-  assert.equal(modeState([]), 'empty');
-  assert.equal(modeState(['on', 'on']), 'on');
-  assert.equal(modeState([{ state: 'on' }, { state: 'off' }]), 'partial');
-  assert.equal(modeState(['off']), 'off');
-});
-
-test('findCalendar prefers Jewish Calendar and tolerates suffixes', () => {
-  const states = Object.fromEntries(fixture('states').map((s) => [s.entity_id, s]));
-  const cal = findCalendar(states);
-  assert.equal(cal.source, 'jewish_calendar');
-  assert.equal(cal.issur, 'binary_sensor.jewish_calendar_issur_melacha_in_effect_2');
-  assert.equal(cal.candleLighting, 'sensor.jewish_calendar_upcoming_candle_lighting_2');
-  assert.equal(cal.hebcal.isShabbat, 'sensor.hebcal_is_shabbat');
-  // A near-miss id is not a match.
-  assert.equal(findCalendar({ 'sensor.jewish_calendar_dateline': { state: 'x' } }).date, null);
-  assert.equal(findCalendar({}).source, null);
-});
-
-test('the end-of-Shabbat trigger: Jewish Calendar first, then Hebcal', () => {
-  assert.deepEqual(autoShabbatEndTrigger({ issur: 'binary_sensor.i', hebcal: {} }),
-    { trigger: 'state', entity_id: ['binary_sensor.i'], from: 'on', to: 'off', id: 'motzei_shabbat' });
-  assert.deepEqual(autoShabbatEndTrigger({ motzei: 'binary_sensor.m', hebcal: {} }).to, 'on');
-  assert.deepEqual(autoShabbatEndTrigger({ hebcal: { isShabbat: 'sensor.hebcal_is_shabbat' } }),
-    { trigger: 'state', entity_id: ['sensor.hebcal_is_shabbat'], from: 'True', to: 'False', id: 'motzei_shabbat' });
-  assert.equal(autoShabbatEndTrigger({ hebcal: {} }), null);
-});
-
-test('the automatic-Shabbat automation matches the contract', () => {
-  const a = buildAutoShabbatAutomation({
-    id: '5',
-    labelId: 'shbt',
-    shabbatEndTrigger: autoShabbatEndTrigger({ hebcal: { isShabbat: 'sensor.hebcal_is_shabbat' } }),
-  });
-  assert.equal(a.alias, AUTO_SHABBAT_ALIAS);
-  assert.ok(isOurs(a));
-  assert.equal(a.mode, 'single');
-  assert.deepEqual(a.triggers[0], { trigger: 'time', at: '12:00:00', id: 'erev_shabbat' });
-  const [erev, motzei] = a.actions[0].choose;
-  assert.deepEqual(erev.conditions[1], { condition: 'time', weekday: ['fri'] });
-  assert.deepEqual(erev.sequence, [{ action: 'automation.turn_on', target: { label_id: 'shbt' } }]);
-  assert.equal(motzei.sequence[0].wait_template,
-    "{{ label_entities('shbt') | select('match', 'schedule\\\\.') | select('is_state', 'on') | list | count == 0 }}");
-  assert.equal(motzei.sequence[0].timeout, '06:00:00');
-  assert.deepEqual(motzei.sequence[1], { action: 'automation.turn_off', target: { label_id: 'shbt' }, data: { stop_actions: false } });
 });

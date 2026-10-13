@@ -33,7 +33,6 @@
 <div class="bar" id="bar"></div>
 <div class="grid">
   <schedule-helper-card id="schedules"></schedule-helper-card>
-  <schedule-helper-shabbat-card id="shabbat"></schedule-helper-shabbat-card>
 </div>
 <div id="log"></div>
 <script type="module">
@@ -60,11 +59,8 @@
     value === null ? p.delete(key) : p.set(key, value);
     return `<a href="?${p}">${text}</a>`;
   };
-  const live = q.get('live') === '1';
-  const writes = live && q.get('writes') === '1';
   document.getElementById('bar').innerHTML = [
-    live ? `<b>live${writes ? ' — WRITES ENABLED' : ' (read-only)'}</b>` : '<b>offline</b>',
-    live ? link('live', null, 'offline') : link('live', '1', 'live'),
+    '<b>offline preview</b>',
     lang === 'he' ? link('lang', 'en', 'English') : link('lang', null, 'עברית'),
     q.get('theme') === 'dark' ? link('theme', null, 'light') : link('theme', 'dark', 'dark'),
     q.get('admin') === '0' ? link('admin', null, 'admin') : link('admin', '0', 'non-admin'),
@@ -72,25 +68,18 @@
   ].join(' · ');
 
   const log = (m) => { const el = document.getElementById('log'); el.textContent = m + '\n' + el.textContent; };
-  const cards = [document.getElementById('schedules'), document.getElementById('shabbat')];
-  const configs = [JSON.parse(q.get('schedules') || '{}'), JSON.parse(q.get('shabbat') || '{}')];
+  const cards = [document.getElementById('schedules')];
+  const configs = [JSON.parse(q.get('schedules') || '{}')];
   const editors = [];
-  let source;
-  if (live) {
-    const { connectLive } = await import('./live-hass.mjs');
-    source = await connectLive({ writes, language: lang, log, onChange: (h) => push(h) });
-  } else {
-    const names = ['states', 'schedule_list', 'automation_configs', 'label_registry', 'entity_registry_display', 'area_registry', 'device_registry', 'yaml_schedules'];
-    let fixtures = Object.fromEntries(await Promise.all(names.map(async (n) => [n, await (await fetch(`../tests/fixtures/${n}.json`)).json()])));
-    if (lang === 'en') fixtures = (await import('./english-house.mjs')).englishHouse(fixtures);
-    const fake = new FakeHass(fixtures, { isAdmin: q.get('admin') !== '0', language: lang, stateDelay: 300 });
-    window.fake = fake;
-    source = fake;
-    let seen = 0;
-    setInterval(() => { for (; seen < fake.calls.length; seen++) log(JSON.stringify(fake.calls[seen])); }, 300);
-    setInterval(() => { fake.tick(); push(); }, 60000);
-    fake.onChange(() => push());
-  }
+  const names = ['states', 'schedule_list', 'automation_configs', 'label_registry', 'entity_registry_display', 'area_registry', 'device_registry', 'yaml_schedules'];
+  let fixtures = Object.fromEntries(await Promise.all(names.map(async (n) => [n, await (await fetch(`../tests/fixtures/${n}.json`)).json()])));
+  if (lang === 'en') fixtures = (await import('./english-house.mjs')).englishHouse(fixtures);
+  const source = new FakeHass(fixtures, { isAdmin: q.get('admin') !== '0', language: lang, stateDelay: 300 });
+  window.fake = source;
+  let seen = 0;
+  setInterval(() => { for (; seen < source.calls.length; seen++) log(JSON.stringify(source.calls[seen])); }, 300);
+  setInterval(() => { source.tick(); push(); }, 60000);
+  source.onChange(() => push());
 
   // HA calls setConfig more than once, and sets hass before and after: do the same here.
   cards.forEach((c, i) => { if (c.setConfig) { c.setConfig(configs[i]); c.hass = source.snapshot(); c.setConfig(configs[i]); } });

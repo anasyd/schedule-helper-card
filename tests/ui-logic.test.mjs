@@ -62,24 +62,6 @@ test('actionOptions per device', () => {
   assert.equal(actionOptions(states['switch.hot_plate']).temp, null);
 });
 
-import { calendarRows, findCalendar } from '../dist/schedule-helper-card.js';
-
-test('calendarRows: Jewish Calendar first, Hebcal where it has nothing', () => {
-  const states = Object.fromEntries(fx('states').map((s) => [s.entity_id, s]));
-  const now = new Date('2026-01-04T09:00:00+02:00');
-  const c = calendarRows(states, findCalendar(states), 'he', now);
-  assert.equal(c.date, 'ט״ו טבת תשפ״ו');
-  assert.equal(c.inEffect, false);
-  const labels = c.rows.map((r) => r.label);
-  assert.deepEqual(labels, ['פרשה', 'הדלקת נרות', 'הבדלה']); // the empty holiday is left out
-  // Hebcal only: its HH:MM strings pass through.
-  const hebcal = Object.fromEntries(Object.entries(states).filter(([id]) => !id.includes('jewish_calendar')));
-  hebcal['sensor.hebcal_shabbat_entry'] = { entity_id: 'sensor.hebcal_shabbat_entry', state: '16:26', attributes: {} };
-  const h = calendarRows(hebcal, findCalendar(hebcal), 'he', now);
-  assert.equal(h.date, 'יום ראשון, ט״ו בטבת תשפ״ו');
-  assert.deepEqual(h.rows.find((r) => r.label === 'הדלקת נרות').value, '16:26');
-});
-
 import { cssHeight } from '../dist/schedule-helper-card.js';
 
 test('cssHeight: a bare number is pixels, other units pass through, empty is automatic', () => {

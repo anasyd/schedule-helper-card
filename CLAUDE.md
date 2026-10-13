@@ -1,28 +1,7 @@
-# Schedule Helper Card
+# Schedule Helper Card Lite
 
-A Home Assistant dashboard plugin (HACS, category *Dashboard*): `dist/schedule-helper-card.js` registers
-`schedule-helper-card` and `schedule-helper-shabbat-card` (and, for dashboards made before 2.0, `beit-schedule-card` and
-`beit-shabbat-card`). The plan is [PLAN.md](PLAN.md). The data model shared with the Beit app is
-[docs/contract.md](docs/contract.md). Read both before changing anything.
+This fork ships one Home Assistant dashboard card in `dist/schedule-helper-card.js`. Keep the card small and reviewable. It uses Home Assistant's native schedule helpers and automations.
 
-## Rules
+Never commit real Home Assistant credentials, URLs, device identifiers, or household data. The fixtures in `tests/fixtures` are synthetic. The offline preview in `dev/card-preview.html` must remain offline.
 
-- **This repo is public.** Never commit data from a real house: entity names, areas, automations, IPs, URLs, tokens.
-  - Test fixtures are synthetic.
-  - `dev.env.json` (HA url + token for live preview) is git-ignored and stays that way.
-- **Testing against a real Home Assistant:** read-only by default.
-  - The only allowed write is the probe round trip in PLAN.md §7: a `zz beit probe` schedule whose hours cannot come
-    up during the test, created and then deleted.
-  - Never toggle devices, never edit or delete existing schedules, automations or labels, and never switch modes.
-- **The contract is shared with the Beit app.** Changing a shape (the marker, the automation JSON, label names) means
-  changing the app too. Don't do it from here alone.
-- **Commits.** One logical change per commit, message in this repo's terms.
-
-## Commands
-
-```bash
-node --test 'tests/*.test.mjs'          # unit + fake-hass tests
-node dev/ui-test.mjs                    # the cards in headless Chrome, clicked through (starts dev/serve.py)
-node dev/screenshots.mjs                # the README screenshots, in English, from the offline preview
-python3 dev/serve.py        # preview at http://localhost:8766 (offline fake hass; ?live=1 for a real HA)
-```
+Run `node --test 'tests/*.test.mjs'` and `node dev/ui-test.mjs` after changing the card. Make one logical change per commit.

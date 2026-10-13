@@ -1,303 +1,62 @@
-<h1 align="center">Schedule Helper Card</h1>
+# Schedule Helper Card Lite
 
-<p align="center">
-  <b>A weekly schedule card for any device</b>, for any home, on your Home Assistant dashboard.<br>
-  Built entirely on Home Assistant's own <b>schedule helper</b> and ordinary automations. No custom integration, no extra
-  engine running on your server.<br>
-  <i>Optional extra:</i> Shabbat and Jewish holiday (chag) modes, for homes that keep them.
-</p>
+A Home Assistant dashboard card for creating and editing weekly schedules for lights, switches, heating, water heaters, covers, and other supported entities. This fork keeps the general schedule card and removes the Shabbat and Jewish holiday modes.
 
-<p align="center">
-  <a href="https://github.com/hacs/integration"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS"></a>
-  <a href="https://github.com/yybd/schedule-helper-card/releases"><img src="https://img.shields.io/github/v/release/yybd/schedule-helper-card" alt="Release"></a>
-  <a href="https://github.com/yybd/schedule-helper-card/actions/workflows/validate.yml"><img src="https://github.com/yybd/schedule-helper-card/actions/workflows/validate.yml/badge.svg" alt="Validate"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/yybd/schedule-helper-card" alt="License"></a>
-</p>
+## What it creates
 
-<p align="center"><img src="https://raw.githubusercontent.com/yybd/schedule-helper-card/main/docs/card.png" alt="The schedules card and the Shabbat and Jewish holidays card" width="760"></p>
+The card uses Home Assistant's native `schedule` helper and a normal automation that acts on the selected device. The schedule and automation remain in Home Assistant if the card is removed. An administrator can create and edit schedules; other users can view them.
 
----
+A schedule has one or more daily time ranges. At the start of a range, the automation runs the selected on action. At the end, it runs the off action if that option is enabled. For climate entities, the card can set an HVAC mode and target temperature. For lights, it can set brightness.
 
-## Contents
+The generated automation responds to schedule state transitions. It does not currently reapply a device state after Home Assistant restarts during an active range. Test that behavior before relying on it for heating or other important equipment.
 
-- [Two cards](#two-cards)
-- [Features](#features)
-- [Screenshots](#screenshots)
-- [Why Schedule Helper Card](#why-schedule-helper-card)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Shabbat and Jewish holiday (chag) modes](#shabbat-and-jewish-holiday-chag-modes)
-- [How it works](#how-it-works)
-- [Permissions](#permissions)
-- [FAQ](#faq)
-- [Contributing](#contributing)
-- [License](#license)
+## Install from this fork
 
-## Two cards
+1. In HACS, open **Custom repositories**.
+2. Add `https://github.com/anasyd/schedule-helper-card` as a **Dashboard** repository.
+3. Find **Schedule Helper Card** in HACS and install it.
+4. Refresh the Home Assistant browser or Companion app.
+5. Add a **Custom: Schedule Helper Card** to a dashboard, or use its visual editor to create a dedicated Schedule Helper dashboard.
 
-> **You don't need to keep Shabbat to use this.** The Schedules card is a general-purpose weekly scheduler for any
-> device in any home. Shabbat and the Jewish holidays are an optional extra: a second card you can simply not add, and
-> a switch (`show_modes: false`) that hides them from the Schedules card.
->
-> *Chag* is Hebrew for a **Jewish holiday**: the festival days kept like Shabbat (Yom Tov), such as Rosh Hashanah,
-> Yom Kippur, Sukkot, Pesach and Shavuot.
-
-The package contains **two separate cards**. Add one or both; each works on its own.
-
-| | Card | What it is for |
-|:-:|---|---|
-| 🗓️ | **Schedules**<br>`custom:schedule-helper-card`<br>*the main card, for every home* | **Setting up schedules.** Create and edit a weekly schedule for any device (air conditioner, heating, lights, water heater, plugs, blinds): the hours for each day, and what the device does. To hide everything about Shabbat and chag, set `show_modes: false`. |
-| 🕯️ | **Shabbat & Jewish holidays**<br>`custom:schedule-helper-shabbat-card`<br>*optional* | **For homes that keep Shabbat and the Jewish holidays (chag).** Switch each mode on or off, choose which automations belong to it, set automatic Shabbat and chag, and see candle lighting, havdalah and the parasha. |
-
-## Features
-
-### 🗓️ Schedules card
-
-- **Schedule a device in one step.** Choose a device (air conditioner, light, water heater, plug, blinds), what it should
-  do while the schedule is active (HVAC mode, temperature, brightness), and the hours for each day of the week. The card
-  creates the schedule helper and the automation that drives the device.
-- **Edit every schedule in the house.** A clear week view for each UI-managed schedule helper. You can add ranges, copy a
-  day to the other weekdays or to the whole week, and set ranges that run until midnight. For a schedule the card
-  created, you can also change the device and what it does; renaming a schedule renames its automation too.
-- **Put a schedule in a mode.** Mark it as a Shabbat or chag schedule, so the Shabbat & chag card switches it with the
-  rest of the mode.
-
-### 🕯️ Shabbat & Jewish holidays (chag) card (optional)
-
-- **Shabbat and chag modes.** A single switch turns on or off every automation that belongs to a mode, and the card
-  shows whether the mode is fully on, partly on or off.
-- **Automatic Shabbat and chag.** Switches the mode on before its schedules begin (at a time you choose, or some hours
-  before candle lighting) and off after it ends, only once every schedule of the mode has finished, so no device is
-  left running.
-- **Jewish calendar on the card.** Candle lighting, havdalah, the parasha and today's holiday, from the core
-  [Jewish Calendar](https://www.home-assistant.io/integrations/jewish_calendar/) integration (or Hebcal, if installed).
-
-### Both
-
-- **English and Hebrew.** The cards follow the language in each user's Home Assistant profile: Hebrew gets a full
-  right-to-left layout, anything else English. The week starts on Sunday.
-- **Visual editors.** Both cards are set up from the dashboard's own card editor; no YAML needed.
-
-## Screenshots
-
-All screenshots use the invented house in `tests/fixtures`, in English. For a user whose Home Assistant language is
-Hebrew, the cards are in Hebrew and the whole layout is right to left.
-
-| Editing a schedule | A new schedule for an air conditioner |
-|:-:|:-:|
-| <img src="https://raw.githubusercontent.com/yybd/schedule-helper-card/main/docs/editor.png" alt="The editor: name, Shabbat mode, the automations it drives and the week" width="380"> | <img src="https://raw.githubusercontent.com/yybd/schedule-helper-card/main/docs/new-schedule.png" alt="A new schedule: the device, HVAC mode, temperature and turn off at the end" width="380"> |
-
-| Dark theme, fixed height | On a phone |
-|:-:|:-:|
-| <img src="https://raw.githubusercontent.com/yybd/schedule-helper-card/main/docs/dark-english.png" alt="Both cards with a dark theme and a fixed height" width="440"> | <img src="https://raw.githubusercontent.com/yybd/schedule-helper-card/main/docs/mobile.png" alt="The editor full screen on a phone" width="220"> |
-
-## Why Schedule Helper Card
-
-Home Assistant already has good scheduling tools. This card makes a different trade-off. **It writes Home Assistant's
-own objects rather than bringing its own scheduling engine.**
-
-| | **Schedule Helper Card** | Built-in schedule helper editor | [Scheduler card + component](https://github.com/nielsfaber/scheduler-component) | [Weekly Schedule Card](https://community.home-assistant.io/t/weekly-schedule-card-a-visual-weekly-grid-card-for-the-scheduler-component/1012671) | [schedule_state](https://github.com/aneeshd/schedule_state) |
-|---|:-:|:-:|:-:|:-:|:-:|
-| Stores schedules in HA's native `schedule` helper | ✅ | ✅ | ❌ own storage | ❌ scheduler component | ❌ own sensor |
-| Needs a custom integration on the server | **No** | No | Yes | Yes | Yes |
-| Schedule and device configured together | ✅ | ❌ automation written by hand | ✅ | ✅ | ❌ |
-| Device driven by a standard, editable HA automation | ✅ | ✅ (your own) | ❌ internal engine | ❌ internal engine | ✅ (your own) |
-| Keeps working if the card is removed | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Shabbat / Jewish holiday modes | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Restart-safe automations | ✅ | Depends on you | ✅ | ✅ | Depends on you |
-| Deletes only what it created | ✅ | — | — | — | — |
-| Hebrew / right-to-left | ✅ | Partial | Partial | ❌ | ❌ |
-
-**What this means in practice**
-
-1. **Nothing server-side to break.** The card is a single dashboard file. There is no integration to update or to fail
-   after a Home Assistant upgrade.
-2. **No lock-in.** Everything the card creates is a regular schedule helper and a regular automation. You can see and
-   edit them under *Settings → Automations & Scenes* and *Settings → Helpers*, and they keep working without the card.
-3. **Built for Shabbat and chag.** Modes are Home Assistant labels, so a mode's automations are visible and filterable
-   everywhere in Home Assistant. Automatic Shabbat mode is timed around real schedules, not only candle lighting.
-4. **Careful by design.**
-   - Automations ignore the brief "unavailable" state after a restart, so devices don't switch on or off on their own.
-   - Deleting a schedule removes only the automation the card created. Automations you wrote yourself are left in
-     place and listed.
-5. **One data model across apps.** The card and its companion app, Beit, for iOS, Android, macOS and Windows read and
-   write the same objects.
-
-**Where other tools go further.** The Scheduler card supports arbitrary service calls, conditions and sun-based times.
-The Weekly Schedule Card and the built-in editor let you draw ranges by dragging on a grid. Schedule Helper Card focuses
-on device schedules and Shabbat/chag modes.
-
-## Requirements
-
-- Home Assistant **2025.1** or newer.
-- An **administrator** account to create or edit schedules. Other users see a read-only view (see
-  [Permissions](#permissions)).
-- For Shabbat and chag times, the core **Jewish Calendar** integration (recommended) or Hebcal. Optional: the modes
-  work without it.
-
-## Installation
-
-### HACS (recommended)
-
-[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=yybd&repository=schedule-helper-card&category=plugin)
-
-Or add it by hand:
-
-1. In Home Assistant, open **HACS**.
-2. Open the menu (⋮) → **Custom repositories**.
-3. Add `https://github.com/yybd/schedule-helper-card` with type **Dashboard**.
-4. Search for **Schedule Helper Card**, open it and select **Download**.
-5. Reload the browser.
-
-HACS registers the dashboard resource for you.
-
-### Manual installation
-
-1. Download `schedule-helper-card.js` from the [latest release](https://github.com/yybd/schedule-helper-card/releases/latest).
-2. Copy it to `/config/www/schedule-helper-card.js`.
-3. Go to *Settings → Dashboards → ⋮ → Resources → Add resource*.
-4. Enter the URL `/local/schedule-helper-card.js` with type **JavaScript module**.
-5. Reload the browser.
-
-### Add the cards
-
-After installing, reload the browser. Then either:
-
-- **One click: a Schedule Helper dashboard.** Open any dashboard → ⋮ → *Edit dashboard* → *Add card* → **Schedule Helper
-  Card**. At the top of the card's editor, **Create the Schedule Helper dashboard** adds a new dashboard named *Schedule Helper*
-  to the sidebar, with both cards. Nothing else is changed; if it already exists, the button offers to open it.
-  You can close the Add card dialog without adding the card.
-- **By hand.** *Settings → Dashboards → Add dashboard → New dashboard from scratch*, name it, open it, then ⋮ → *Edit
-  dashboard* → ⋮ → *Raw configuration editor*, and paste:
-
-  ```yaml
-  views:
-    - title: Schedule Helper
-      cards:
-        - type: custom:schedule-helper-card
-        - type: custom:schedule-helper-shabbat-card
-  ```
-
-  Or add the cards to any existing dashboard from *Add card*: search for **Schedule Helper**.
-
-### Upgrading from Beit Schedule Card (1.x)
-
-The card was called *Beit Schedule Card* until 2.0, in the repository `yybd/beit-schedule-card` (GitHub redirects the
-old address). Dashboards that use `custom:beit-schedule-card` or `custom:beit-shabbat-card` keep working. To move to 2.0:
-
-1. In HACS, remove *Beit Schedule Card* (or *Beit Weekly Schedule*), then add this repository again and download it.
-   The file is now `schedule-helper-card.js`; HACS registers the new resource.
-2. Check *Settings → Dashboards → ⋮ → Resources*: if `/hacsfiles/beit-schedule-card/beit-schedule-card.js` is still
-   listed, delete it (HACS may leave it behind, pointing at a file that is gone).
-3. Optionally, change your cards' types to `custom:schedule-helper-card` and `custom:schedule-helper-shabbat-card`.
+Manual resource path, if needed: `/hacsfiles/schedule-helper-card/schedule-helper-card.js`, resource type **JavaScript module**.
 
 ## Configuration
 
-The package contains two cards (see [Two cards](#two-cards)). Both can be added from the dashboard's **Add card** dialog
-and configured in the visual editor.
-
-### 🗓️ Schedules card
+Minimal card:
 
 ```yaml
 type: custom:schedule-helper-card
-title: תזמונים            # optional
-height: 500px              # optional: fixed height, the list scrolls
-mode: שבת                  # optional: show only schedules in this mode (שבת / חג)
-entities:                  # optional: show only these schedules
-  - schedule.living_room_ac
 ```
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `title` | string | `תזמונים` | Card title. |
-| `mode` | string | — | Show only the schedules in this mode. |
-| `entities` | list | all | Show only these schedule helpers. |
-| `hide_entities` | list | — | Hide these schedule helpers. |
-| `show_add` | boolean | `true` | Show the **New schedule** button. |
-| `height` | string | auto | A fixed height, such as `500px` or `60vh`. The title stays put and the list scrolls inside the card. |
-| `device_domains` | list | all | Device types offered when choosing a device, e.g. `[climate, light, water_heater]`. |
-| `show_modes` | boolean | `true` | Show Shabbat and chag: the mode chips and the mode choice in the editor. Turn it off if you have no use for them. |
-
-### 🕯️ Shabbat & Jewish holidays (chag) card (optional)
+Optional settings:
 
 ```yaml
-type: custom:schedule-helper-shabbat-card
-modes: [שבת, חג]           # optional
-show_calendar: true        # optional
+type: custom:schedule-helper-card
+title: Weekly schedules
+show_add: true
+device_domains:
+  - climate
+  - light
+  - switch
+height: 500px
 ```
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `title` | string | `שבת וחג` | Card title. |
-| `modes` | list | `[שבת, חג]` | Which modes to show. |
-| `height` | string | auto | A fixed height, such as `500px` or `60vh`. The title stays put and the rest scrolls inside the card. |
-| `show_calendar` | boolean | `true` | Show candle lighting, havdalah, the parasha and the holiday. |
+The visual editor can also choose which schedule entities appear on the card. Existing dashboards using `custom:beit-schedule-card` continue to work.
 
-## Shabbat and Jewish holiday (chag) modes
+## Security and scope
 
-A mode is a Home Assistant **label**, named `שבת` or `חג`.
+The code installed by HACS is `dist/schedule-helper-card.js`. It has no runtime package dependencies, remote script loading, external network requests, or `eval`. It talks to the Home Assistant APIs available to the logged-in user. Like any dashboard card, it runs in the user's browser with that user's Home Assistant permissions, so only use the editing features with a trusted administrator account.
 
-- **Membership.** An automation belongs to a mode when it carries the label. The schedules it follows carry the label
-  too, so they appear under the mode.
-- **Changing membership.** Use **Choose automations** on the card. Membership is stored in Home Assistant, so every
-  device, and the Home Assistant UI itself, sees the same list.
-- **The mode switch.** It turns every member automation on or off together. The per-automation switches below it stay
-  available.
-- **Automatic Shabbat** (optional, one switch on the card). Creates one automation that:
-  1. turns the Shabbat mode on every **Friday at 12:00**, before typical Friday-afternoon schedules begin. You can pick
-     another time, or a number of hours before candle lighting (with Jewish Calendar);
-  2. turns it off **after Shabbat ends**, but only once every Shabbat schedule has finished.
-- **Automatic chag** (optional, needs the core Jewish Calendar integration). The same for chag mode: on erev chag at
-  the time you choose, off after the chag ends. A chag that falls on Shabbat is covered by Shabbat mode, since nothing
-  in the calendar says so a day ahead.
-- **Switching an automatic mode off** disables its automation. It is never deleted, so changes you made to it in Home
-  Assistant survive.
+This fork's deletion path only removes a related automation if its full configuration still matches the card's generated shape. Hand-edited and unrelated automations are left alone.
 
-## How it works
+## Development
 
-For every schedule it creates, the card writes two standard Home Assistant objects:
+```sh
+node --test 'tests/*.test.mjs'
+node dev/ui-test.mjs
+python3 dev/serve.py
+```
 
-1. **A schedule helper** (`schedule.*`) holding the weekly hours.
-2. **An automation** (`Beit · <name>`) that performs the "on" action when the schedule turns on and the "off" action
-   when it turns off.
-   - It ignores transitions from `unavailable`/`unknown`, so a restart never switches a device.
-   - Its description carries a marker (shared with the companion Beit app). That is how the card knows which
-     automations it may later edit or delete.
+The preview server serves synthetic fixtures on localhost and does not connect to a real Home Assistant instance.
 
-The full data model is documented in [docs/contract.md](docs/contract.md).
-
-## Permissions
-
-Home Assistant allows only administrators to create or change helpers, automations and labels. For non-admin users,
-the card shows schedules (with their week) and modes read-only. Switching a mode on or off uses ordinary service calls and works for
-every user.
-
-## FAQ
-
-**Can I edit a schedule the card created in Home Assistant's own editor?**
-Yes. Both the helper and the automation are standard objects. If you rewrite the automation by hand, the card treats
-it as yours and will not delete it.
-
-**What happens to my existing schedules and automations?**
-The card lists your existing UI-managed schedule helpers and lets you edit their hours. It never modifies or deletes
-automations it did not create. Schedules defined in YAML are shown read-only, since Home Assistant does not allow them
-to be edited through its API.
-
-**Does it work in the Home Assistant Companion app?**
-Yes. It is a regular dashboard card, so it works wherever your dashboards do.
-
-## Contributing
-
-Issues and pull requests are welcome.
-
-- Run the tests with `node --test 'tests/*.test.mjs'`, and the browser tests (headless Chrome) with
-  `node dev/ui-test.mjs`.
-- Preview the card without Home Assistant with `python3 dev/serve.py`, then open http://localhost:8766. The preview
-  runs on a fake Home Assistant over the synthetic data in `tests/fixtures`. To look at your own Home Assistant, put
-  `{"url": "...", "token": "..."}` in `dev.env.json` (git-ignored) and add `?live=1`. Live mode is read-only unless you
-  also add `&writes=1`.
-
-## License
-
-[MIT](LICENSE)
+Based on [yybd/schedule-helper-card](https://github.com/yybd/schedule-helper-card). MIT license; see [LICENSE](LICENSE).
